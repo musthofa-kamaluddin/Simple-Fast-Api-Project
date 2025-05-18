@@ -152,7 +152,7 @@
                 const response = await fetch(`${API_URL}/${id}`, {
                     method: 'DELETE'
                 });
-                if (!response.ok) throw new Error('Failed to delete task');
+                if (!response.ok) throw new Error('Failed to delete task!');
                 loadTasks();
             } catch (error) {
                 showError(`Error deleting task: ${error.message}`);
