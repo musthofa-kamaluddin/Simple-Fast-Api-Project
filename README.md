@@ -115,7 +115,7 @@ todo-list/
 Proyek ini dilisensikan di bawah [MIT License](LICENSE).
 
 ## Kontak
-Pertanyaan atau saran? Buat [issue](https://github.com/<username>/todo-list/issues) di GitHub.
+Pertanyaan atau saran? Buat [issue](https://github.com/musthofa-kamaluddin/Simple-Fast-Api-Project/issues) di GitHub.
 
 ---
 Dibuat dengan ☕ menggunakan FastAPI dan Tailwind CSS.
