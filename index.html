@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl">
+        <h1 class="text-3xl font-bold mb-4 text-center">Todo List</h1>
+        
+        <!-- Form dan Filter -->
+        <div class="mb-4">
+            <div class="flex flex-col sm:flex-row gap-2 mb-2">
+                <input type="text" id="taskTitle" placeholder="Task Title" class="flex-1 p-2 border rounded">
+                <textarea id="taskDescription" placeholder="Task Description (optional)" class="flex-1 p-2 border rounded"></textarea>
+                <button onclick="addTask()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Task</button>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input type="text" id="searchInput" placeholder="Search tasks..." class="flex-1 p-2 border rounded" oninput="loadTasks()">
+                <select id="filterStatus" onchange="loadTasks()" class="p-2 border rounded">
+                    <option value="">All Tasks</option>
+                    <option value="true">Completed</option>
+                    <option value="false">Not Completed</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Loading dan Error -->
+        <div id="loading" class="hidden text-center text-gray-500">Loading...</div>
+        <div id="error" class="hidden text-center text-red-500"></div>
+
+        <!-- Daftar tugas -->
+        <ul id="taskList" class="space-y-2"></ul>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000/tasks';
+
+        // Fungsi untuk memuat daftar tugas
+        async function loadTasks() {
+            const loading = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            const taskList = document.getElementById('taskList');
+            
+            loading.classList.remove('hidden');
+            errorDiv.classList.add('hidden');
+            taskList.innerHTML = '';
+
+            try {
+                const search = document.getElementById('searchInput').value;
+                const filterStatus = document.getElementById('filterStatus').value;
+                let url = API_URL;
+                const params = new URLSearchParams();
+                if (search) params.append('search', search);
+                if (filterStatus) params.append('completed', filterStatus);
+                if (params.toString()) url += `?${params.toString()}`;
+
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+                const tasks = await response.json();
+
+                tasks.forEach(task => {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center justify-between p-3 border rounded bg-gray-50';
+                    li.innerHTML = `
+                        <div class="flex items-center">
+                            <input type="checkbox" ${task.completed ? 'checked' : ''} onchange="toggleTask(${task.id}, ${!task.completed})" class="mr-3">
+                            <div>
+                                <span class="${task.completed ? 'line-through text-gray-500' : 'text-gray-800'} font-medium">${task.title}</span>
+                                ${task.description ? `<p class="text-sm text-gray-500">${task.description}</p>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="editTask(${task.id})" class="text-blue-500 hover:underline">Edit</button>
+                            <button onclick="deleteTask(${task.id})" class="text-red-500 hover:underline">Delete</button>
+                        </div>
+                    `;
+                    taskList.appendChild(li);
+                });
+            } catch (error) {
+                errorDiv.textContent = `Error: ${error.message}`;
+                errorDiv.classList.remove('hidden');
+                console.error('Error loading tasks:', error);
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+
+        // Fungsi untuk menambah tugas
+        async function addTask() {
+            const title = document.getElementById('taskTitle').value.trim();
+            const description = document.getElementById('taskDescription').value.trim();
+            if (!title) {
+                showError('Title is required!');
+                return;
+            }
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: Date.now(), // ID sementara
+                        title,
+                        description: description || null,
+                        completed: false
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to add task');
+                document.getElementById('taskTitle').value = '';
+                document.getElementById('taskDescription').value = '';
+                loadTasks();
+            } catch (error) {
+                showError(`Error adding task: ${error.message}`);
+            }
+        }
+
+        // Fungsi untuk mengedit tugas
+        async function editTask(id) {
+            const newTitle = prompt('Enter new title:', '');
+            const newDescription = prompt('Enter new description (optional):', '');
+            if (!newTitle || !newTitle.trim()) {
+                showError('Title is required!');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id,
+                        title: newTitle.trim(),
+                        description: newDescription ? newDescription.trim() : null,
+                        completed: false
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to update task');
+                loadTasks();
+            } catch (error) {
+                showError(`Error updating task: ${error.message}`);
+            }
+        }
+
+        // Fungsi untuk menghapus tugas
+        async function deleteTask(id) {
+            if (!confirm('Are you sure you want to delete this task?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) throw new Error('Failed to delete task');
+                loadTasks();
+            } catch (error) {
+                showError(`Error deleting task: ${error.message}`);
+            }
+        }
+
+        // Fungsi untuk mengubah status tugas
+        async function toggleTask(id, completed) {
+            try {
+                const taskResponse = await fetch(`${API_URL}/${id}`);
+                if (!taskResponse.ok) throw new Error('Failed to fetch task');
+                const task = await taskResponse.json();
+                
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...task, completed })
+                });
+                if (!response.ok) throw new Error('Failed to update task status');
+                loadTasks();
+            } catch (error) {
+                showError(`Error updating task status: ${error.message}`);
+            }
+        }
+
+        // Fungsi untuk menampilkan pesan error
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            setTimeout(() => errorDiv.classList.add('hidden'), 3000);
+        }
+
+        // Memuat tugas saat halaman dibuka
+        loadTasks();
+    </script>
+</body>
+</html>

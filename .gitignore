@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+*.env
+
+# IDE/Editor
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Sistem Operasi
+.DS_Store
+Thumbs.db
+
+# Log dan file sementara
+*.log
+*.cache
+*.bak
