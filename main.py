@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 import uvicorn
 import logging
+from datetime import datetime
 
 # Konfigurasi logging
 logging.basicConfig(level=logging.INFO)
@@ -14,7 +15,7 @@ app = FastAPI(title="Enhanced Task API")
 # Tambahkan CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],  # Dukung localhost
+    allow_origins=["*"],  # In production, replace with specific origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -22,25 +23,35 @@ app.add_middleware(
 
 # Model untuk Task dengan validasi
 class Task(BaseModel):
-    id: int = Field(..., gt=0, description="Unique task ID")
+    id: Optional[int] = Field(None, gt=0, description="Unique task ID")
     title: str = Field(..., min_length=1, max_length=100, description="Task title")
     description: Optional[str] = Field(None, max_length=500, description="Task description")
     completed: bool = Field(False, description="Task completion status")
+    created_at: datetime = Field(default_factory=datetime.now)
 
-    @validator("title")
-    def title_must_not_be_empty(cls, v):
+    @field_validator("title")
+    @classmethod
+    def title_must_not_be_empty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("Title cannot be empty or only whitespace")
         return v.strip()
 
-    @validator("description")
-    def description_must_not_be_empty(cls, v):
+    @field_validator("description")
+    @classmethod
+    def description_must_not_be_empty(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and not v.strip():
             raise ValueError("Description cannot be empty or only whitespace")
         return v.strip() if v else None
 
 # Simulasi database sederhana
 tasks_db: List[Task] = []
+current_id = 1
+
+def get_next_id() -> int:
+    global current_id
+    id = current_id
+    current_id += 1
+    return id
 
 @app.get("/tasks", response_model=List[Task])
 async def get_tasks(
@@ -81,8 +92,7 @@ async def get_task(task_id: int):
 async def create_task(task: Task):
     """Membuat tugas baru."""
     try:
-        if any(t.id == task.id for t in tasks_db):
-            raise HTTPException(status_code=400, detail="Task ID already exists")
+        task.id = get_next_id()
         tasks_db.append(task)
         logger.info(f"Created task with ID {task.id}")
         return task
@@ -94,10 +104,9 @@ async def create_task(task: Task):
 async def update_task(task_id: int, updated_task: Task):
     """Memperbarui tugas berdasarkan ID."""
     try:
-        if updated_task.id != task_id:
-            raise HTTPException(status_code=400, detail="Task ID mismatch")
         for index, task in enumerate(tasks_db):
             if task.id == task_id:
+                updated_task.id = task_id  # Ensure ID remains the same
                 tasks_db[index] = updated_task
                 logger.info(f"Updated task with ID {task_id}")
                 return updated_task
